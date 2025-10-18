@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__serena__get_current_config",
+      "mcp__serena__list_dir",
+      "mcp__serena__find_file",
+      "mcp__serena__activate_project",
+      "mcp__serena__list_memories",
+      "Bash(mkdir -p claudedocs)",
+      "Bash(brew install yt-dlp)",
+      "Bash(npm install)",
+      "Bash(npm run electron:dev)",
+      "Bash(yt-dlp --dump-json --no-warnings \"https://www.youtube.com/watch?v=jNQXAC9IVRw\")",
+      "Bash(npm install better-sqlite3 plyr)",
+      "Bash(npm install -D tailwindcss postcss autoprefixer)",
+      "Bash(npx tailwindcss init -p)",
+      "Bash(npm rebuild better-sqlite3 --runtime=electron --dist-url=https://electronjs.org/headers --target=28.0.0 --abi=119)",
+      "Bash(npm install --save-dev electron-rebuild)",
+      "Bash(npx electron-rebuild -f -w better-sqlite3)",
+      "Bash(npm install @tailwindcss/postcss)",
+      "Bash(npm install --save-dev @electron/rebuild)",
+      "Bash(npx @electron/rebuild)",
+      "Bash(pkill -f \"electron\")",
+      "Bash(pkill -f \"vite\")",
+      "Bash(cat package.json)",
+      "Bash(npm uninstall tailwindcss @tailwindcss/postcss)",
+      "Bash(npm install -D tailwindcss@3 postcss autoprefixer)",
+      "Bash(npm run build)",
+      "Bash(pip3 install setuptools)",
+      "Bash(python3 -m pip install setuptools --break-system-packages --user)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
