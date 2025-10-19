@@ -5,6 +5,7 @@
   "main": "dist-electron/main.js",
   "type": "module",
   "scripts": {
+    "start": "vite",
     "dev": "vite",
     "build": "vite build && electron-builder",
     "build:mac": "vite build && electron-builder --mac",
@@ -12,7 +13,7 @@
     "build:zip": "vite build && electron-builder --mac zip",
     "package": "npm run build",
     "preview": "vite preview",
-    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:dev": "vite",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [
@@ -27,8 +28,8 @@
     "@electron/rebuild": "^4.0.1",
     "@sveltejs/vite-plugin-svelte": "^3.0.1",
     "@tsconfig/svelte": "^5.0.2",
+    "@types/better-sqlite3": "^7.6.13",
     "autoprefixer": "^10.4.21",
-    "concurrently": "^8.2.2",
     "electron": "^28.0.0",
     "electron-builder": "^24.9.1",
     "electron-rebuild": "^3.2.9",
@@ -40,12 +41,12 @@
     "typescript": "^5.3.3",
     "vite": "^5.0.8",
     "vite-plugin-electron": "^0.28.0",
-    "vite-plugin-electron-renderer": "^0.14.5",
-    "wait-on": "^7.2.0"
+    "vite-plugin-electron-renderer": "^0.14.5"
   },
   "dependencies": {
     "better-sqlite3": "^12.4.1",
-    "plyr": "^3.8.3"
+    "plyr": "^3.8.3",
+    "youtubei.js": "^16.0.1"
   },
   "build": {
     "appId": "com.tubecrawler.app",
@@ -65,7 +66,10 @@
     },
     "mac": {
       "category": "public.app-category.video",
-      "target": ["dmg", "zip"]
+      "target": [
+        "dmg",
+        "zip"
+      ]
     },
     "dmg": {
       "contents": [

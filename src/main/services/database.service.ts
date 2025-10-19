@@ -27,6 +27,25 @@ export interface Video {
   updatedAt: string
 }
 
+interface DbVideo {
+  id: number
+  video_id: string
+  url: string
+  title: string
+  description?: string
+  thumbnail_url: string
+  thumbnail_path?: string
+  duration: number
+  channel_name: string
+  upload_date?: string
+  file_path?: string
+  file_size?: number
+  download_status: 'pending' | 'downloading' | 'completed' | 'failed'
+  download_progress: number
+  created_at: string
+  updated_at: string
+}
+
 class DatabaseService {
   private db: Database.Database | null = null
   private dbPath: string
@@ -43,6 +62,30 @@ class DatabaseService {
 
     this.dbPath = path.join(dbDir, 'videos.db')
     console.log('Database path:', this.dbPath)
+  }
+
+  /**
+   * Convert database row (snake_case) to application object (camelCase)
+   */
+  private mapDbVideoToVideo(dbVideo: DbVideo): Video {
+    return {
+      id: dbVideo.id,
+      videoId: dbVideo.video_id,
+      url: dbVideo.url,
+      title: dbVideo.title,
+      description: dbVideo.description,
+      thumbnailUrl: dbVideo.thumbnail_url,
+      thumbnailPath: dbVideo.thumbnail_path,
+      duration: dbVideo.duration,
+      channelName: dbVideo.channel_name,
+      uploadDate: dbVideo.upload_date,
+      filePath: dbVideo.file_path,
+      fileSize: dbVideo.file_size,
+      downloadStatus: dbVideo.download_status,
+      downloadProgress: dbVideo.download_progress,
+      createdAt: dbVideo.created_at,
+      updatedAt: dbVideo.updated_at
+    }
   }
 
   initialize() {
@@ -123,21 +166,24 @@ class DatabaseService {
     if (!this.db) throw new Error('Database not initialized')
 
     const stmt = this.db.prepare('SELECT * FROM videos WHERE id = ?')
-    return stmt.get(id) as Video | undefined
+    const dbVideo = stmt.get(id) as DbVideo | undefined
+    return dbVideo ? this.mapDbVideoToVideo(dbVideo) : undefined
   }
 
   getVideoByVideoId(videoId: string): Video | undefined {
     if (!this.db) throw new Error('Database not initialized')
 
     const stmt = this.db.prepare('SELECT * FROM videos WHERE video_id = ?')
-    return stmt.get(videoId) as Video | undefined
+    const dbVideo = stmt.get(videoId) as DbVideo | undefined
+    return dbVideo ? this.mapDbVideoToVideo(dbVideo) : undefined
   }
 
   getAllVideos(): Video[] {
     if (!this.db) throw new Error('Database not initialized')
 
     const stmt = this.db.prepare('SELECT * FROM videos ORDER BY created_at DESC')
-    return stmt.all() as Video[]
+    const dbVideos = stmt.all() as DbVideo[]
+    return dbVideos.map(dbVideo => this.mapDbVideoToVideo(dbVideo))
   }
 
   searchVideos(query: string): Video[] {
@@ -149,7 +195,8 @@ class DatabaseService {
       ORDER BY created_at DESC
     `)
     const searchTerm = `%${query}%`
-    return stmt.all(searchTerm, searchTerm) as Video[]
+    const dbVideos = stmt.all(searchTerm, searchTerm) as DbVideo[]
+    return dbVideos.map(dbVideo => this.mapDbVideoToVideo(dbVideo))
   }
 
   updateDownloadStatus(
@@ -186,6 +233,13 @@ class DatabaseService {
 
     const stmt = this.db.prepare('DELETE FROM videos WHERE id = ?')
     stmt.run(id)
+  }
+
+  deleteVideoByVideoId(videoId: string) {
+    if (!this.db) throw new Error('Database not initialized')
+
+    const stmt = this.db.prepare('DELETE FROM videos WHERE video_id = ?')
+    stmt.run(videoId)
   }
 
   close() {

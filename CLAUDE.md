@@ -6,9 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Tube Crawler** is an Electron + Svelte desktop application for macOS that manages YouTube video collections for personal learning and research. Users can add videos via URL, download them using yt-dlp, and play them offline with an integrated Plyr video player.
+**Tube Crawler** is an Electron + Svelte desktop application for macOS that manages YouTube video collections for personal learning and research. Users can add videos via URL, download them using Youtube.js, and play them offline with an integrated Plyr video player.
 
-**Tech Stack**: Electron, Svelte, TypeScript, Vite, SQLite, Plyr, Tailwind CSS, yt-dlp
+**Tech Stack**: Electron, Svelte, TypeScript, Vite, SQLite, Plyr, Tailwind CSS, Youtube.js
 
 **Purpose**: Personal use only - educational content management and offline playback
 
@@ -21,8 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install dependencies
 npm install
 
-# Verify external dependencies (yt-dlp, ffmpeg)
-brew install yt-dlp ffmpeg
+# No external dependencies required - Youtube.js is bundled!
 ```
 
 ### Development
@@ -61,7 +60,7 @@ npm test
 npm run test:watch
 
 # Run specific test file
-npm test src/main/services/ytdlp.service.test.ts
+npm test src/main/services/download.service.test.ts
 ```
 
 ### Code Quality
@@ -89,9 +88,8 @@ UI Components                  IPC Handlers
   ↓                              ↓
 Svelte Stores                  Services Layer
   ↓                              ↓
-IPC API Wrapper      ←──→      - YtDlpService
+IPC API Wrapper      ←──→      - DownloadService (Youtube.js)
                                 - DatabaseService
-                                - FileService
                                   ↓
                                File System
                                 - SQLite DB
@@ -103,9 +101,8 @@ IPC API Wrapper      ←──→      - YtDlpService
 1. **IPC Communication**: All renderer-to-main communication goes through typed IPC channels defined in `src/main/ipc/channels.ts`
 
 2. **Service Layer**: Business logic is encapsulated in services (`src/main/services/`)
-   - `ytdlp.service.ts`: Wraps yt-dlp CLI for metadata and downloads
+   - `download.service.ts`: Video downloads using Youtube.js (no external dependencies)
    - `database.service.ts`: SQLite operations with better-sqlite3
-   - `file.service.ts`: File system operations and storage management
 
 3. **State Management**: Svelte stores (`src/renderer/stores/`) manage app state
    - `videos.store.ts`: Video library state
@@ -121,28 +118,49 @@ IPC API Wrapper      ←──→      - YtDlpService
 
 ## Critical Implementation Details
 
-### yt-dlp Integration
+### Youtube.js Integration
+
+**No External Dependencies**: Youtube.js is a pure JavaScript library bundled with the app - no Python, ffmpeg, or CLI tools required!
 
 **Metadata Extraction**:
-```bash
-yt-dlp --dump-json <url>
+```typescript
+const youtube = await Innertube.create()
+const info = await youtube.getInfo(videoId)
+const basicInfo = info.basic_info
+
+// Extract metadata
+const title = basicInfo.title
+const thumbnail = basicInfo.thumbnail?.[0]?.url
+const duration = basicInfo.duration
+const channelName = basicInfo.author
 ```
-Returns JSON with title, thumbnail, duration, channel, etc. Parse and store in SQLite.
 
 **Video Download**:
-```bash
-yt-dlp -f "bestvideo+bestaudio" \
-       --merge-output-format mp4 \
-       --progress --newline \
-       <url> -o downloads/%(id)s.%(ext)s
+```typescript
+const info = await youtube.getInfo(videoId)
+
+// Choose format
+const format = info.chooseFormat({
+  type: 'video+audio',
+  quality: 'best'
+})
+
+// Download stream
+const stream = await info.download({
+  type: 'video+audio',
+  quality: 'best',
+  format: 'mp4'
+})
+
+// Save to file with progress tracking
 ```
 
-**Progress Tracking**: Parse stdout for progress percentage using regex `(\d+\.\d+)%` and emit IPC events.
+**Progress Tracking**: Track download progress by monitoring stream chunks and calculating percentage based on content length.
 
 **Error Handling**:
-- Network errors: Retry with exponential backoff
-- Invalid URL: Return user-friendly error
-- yt-dlp not found: Show installation instructions
+- Network errors: Handled by Promise rejection
+- Invalid URL: Regex validation before API call
+- YouTube API changes: Youtube.js actively maintained and updated
 
 ### SQLite Schema
 
@@ -334,18 +352,16 @@ SELECT * FROM videos;
 SELECT * FROM videos WHERE download_status = 'failed';
 ```
 
-### yt-dlp Debugging
-```bash
-# Test yt-dlp directly
-yt-dlp --dump-json <url>
-yt-dlp -f "bestvideo+bestaudio" --verbose <url>
+### Youtube.js Debugging
+```typescript
+// Test Youtube.js directly in Node.js REPL
+const { Innertube } = require('youtubei.js')
+const youtube = await Innertube.create()
+const info = await youtube.getInfo('VIDEO_ID')
+console.log(info.basic_info)
 ```
 
 ### Common Issues
-
-**"yt-dlp not found"**:
-- Install: `brew install yt-dlp`
-- Verify: `which yt-dlp`
 
 **"Cannot play video file"**:
 - Check `webSecurity: false` in main.ts
@@ -353,8 +369,8 @@ yt-dlp -f "bestvideo+bestaudio" --verbose <url>
 
 **"Download stuck at 0%"**:
 - Check network connection
-- Verify yt-dlp can access URL: `yt-dlp --dump-json <url>`
-- Check logs: `~/Library/Application Support/TubeCrawler/logs/app.log`
+- Verify URL is valid YouTube link
+- Check logs: Console in Electron DevTools
 
 **"Database locked"**:
 - Ensure only one app instance running
@@ -401,8 +417,7 @@ yt-dlp -f "bestvideo+bestaudio" --verbose <url>
 - Sanitize file paths before file operations
 
 ### External Dependencies
-- yt-dlp: Keep updated (`brew upgrade yt-dlp`)
-- ffmpeg: Keep updated (`brew upgrade ffmpeg`)
+- None! Youtube.js is bundled with the app
 - npm packages: Regular `npm audit` and updates
 
 ---
@@ -464,7 +479,7 @@ Required for distribution outside App Store. Configure in `electron-builder.yml`
 - **Vite**: https://vitejs.dev/guide
 - **Plyr**: https://github.com/sampotts/plyr
 - **better-sqlite3**: https://github.com/WiseLibs/better-sqlite3
-- **yt-dlp**: https://github.com/yt-dlp/yt-dlp
+- **Youtube.js**: https://github.com/LuanRT/YouTube.js
 
 ### Helpful Resources
 - Electron + Vite template: https://github.com/electron-vite/electron-vite-vue
@@ -504,4 +519,4 @@ Required for distribution outside App Store. Configure in `electron-builder.yml`
 For issues or questions, refer to:
 - PRD: `claudedocs/PRD.md`
 - GitHub Issues: (if repository is public)
-- yt-dlp issues: https://github.com/yt-dlp/yt-dlp/issues
+- Youtube.js issues: https://github.com/LuanRT/YouTube.js/issues

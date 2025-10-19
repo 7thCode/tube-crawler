@@ -1,21 +1,35 @@
 <script lang="ts">
   import type { VideoMetadata } from '../../types'
-  import { onMount } from 'svelte'
+  import { onMount, createEventDispatcher } from 'svelte'
   import VideoPlayer from './VideoPlayer.svelte'
 
   export let video: VideoMetadata
   export let onDelete: (videoId: string) => void
   export let downloadedFilePath: string | undefined = undefined
 
+  const dispatch = createEventDispatcher()
+
   let downloading = false
-  let downloadProgress = 0
+  let downloadProgress = video.downloadProgress || 0
   let showPlayer = false
   let videoFilePath = ''
+
+  // Sync with video prop
+  $: downloadStatus = video.downloadStatus || 'pending'
+  $: if (video.downloadProgress !== undefined) {
+    downloadProgress = video.downloadProgress
+  }
 
   function formatDuration(seconds: number): string {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  function formatFileSize(bytes: number | undefined): string {
+    if (!bytes) return ''
+    const mb = bytes / (1024 * 1024)
+    return `${mb.toFixed(1)} MB`
   }
 
   async function handleDownload() {
@@ -27,31 +41,32 @@
     try {
       const result = await window.api.video.download(video.id, video.url)
       if (result.success) {
-        alert(`Download completed: ${video.title}`)
+        dispatch('toast', { message: `Download completed: ${video.title}`, type: 'success' })
         downloadProgress = 100
         // Update downloaded file path
         if (result.filePath) {
           downloadedFilePath = result.filePath
         }
       } else {
-        alert(`Download failed: ${result.error}`)
+        dispatch('toast', { message: `Download failed: ${result.error}`, type: 'error' })
       }
     } catch (error) {
       console.error('Download error:', error)
-      alert(`Download failed: ${error}`)
+      dispatch('toast', { message: `Download failed: ${error}`, type: 'error' })
     } finally {
       downloading = false
     }
   }
 
   async function handlePlay() {
-    if (!downloadedFilePath) {
-      alert('Video not downloaded yet')
+    const filePath = video.filePath || downloadedFilePath
+    if (!filePath) {
+      dispatch('toast', { message: 'Video not downloaded yet', type: 'warning' })
       return
     }
 
     // Convert file path to file:// URL
-    videoFilePath = `file://${downloadedFilePath}`
+    videoFilePath = `file://${filePath}`
     showPlayer = true
   }
 
@@ -86,14 +101,25 @@
   </div>
 
   <div class="flex-1 min-w-0">
-    <h3 class="m-0 mb-2 text-base font-medium text-white overflow-hidden overflow-ellipsis whitespace-nowrap">{video.title}</h3>
+    <div class="flex items-center gap-2 mb-2">
+      <h3 class="m-0 text-base font-medium text-white overflow-hidden overflow-ellipsis whitespace-nowrap flex-1">{video.title}</h3>
+      {#if downloadStatus === 'pending'}
+        <span class="px-2 py-1 text-xs rounded bg-blue-600/30 text-blue-400 border border-blue-500/50 flex-shrink-0">🔵 Pending</span>
+      {:else if downloadStatus === 'downloading'}
+        <span class="px-2 py-1 text-xs rounded bg-yellow-600/30 text-yellow-400 border border-yellow-500/50 flex-shrink-0">🟡 {downloadProgress}%</span>
+      {:else if downloadStatus === 'completed'}
+        <span class="px-2 py-1 text-xs rounded bg-green-600/30 text-green-400 border border-green-500/50 flex-shrink-0">🟢 {formatFileSize(video.fileSize)}</span>
+      {:else if downloadStatus === 'failed'}
+        <span class="px-2 py-1 text-xs rounded bg-red-600/30 text-red-400 border border-red-500/50 flex-shrink-0">🔴 Failed</span>
+      {/if}
+    </div>
     <p class="m-0 text-sm text-gray-500">
       {video.channel} • {formatDuration(video.duration)}
     </p>
   </div>
 
   <div class="flex gap-2 flex-shrink-0">
-    {#if downloadedFilePath}
+    {#if downloadStatus === 'completed' && (video.filePath || downloadedFilePath)}
       <button
         on:click={handlePlay}
         title="Play video"
@@ -101,24 +127,29 @@
       >
         ▶️ Play
       </button>
+    {:else if downloadStatus === 'failed'}
+      <button
+        on:click={handleDownload}
+        title="Retry download"
+        class="px-4 py-2 border-0 rounded bg-orange-600 text-white text-sm cursor-pointer transition-all duration-200 hover:bg-orange-500 hover:-translate-y-0.5"
+      >
+        🔄 Retry
+      </button>
+    {:else if downloadStatus === 'downloading'}
+      <button
+        disabled
+        title="Downloading... {downloadProgress}%"
+        class="px-4 py-2 border-0 rounded bg-gray-600 text-white text-sm opacity-70 cursor-not-allowed"
+      >
+        ⏳ {downloadProgress}%
+      </button>
     {:else}
       <button
         on:click={handleDownload}
-        disabled={downloading}
-        title={downloading ? `Downloading... ${downloadProgress}%` : 'Download video'}
-        class="px-4 py-2 border-0 rounded text-white text-sm cursor-pointer transition-all duration-200"
-        class:bg-primary={!downloading}
-        class:hover:bg-secondary={!downloading}
-        class:hover:-translate-y-0.5={!downloading}
-        class:bg-gray-600={downloading}
-        class:opacity-70={downloading}
-        class:cursor-not-allowed={downloading}
+        title="Download video"
+        class="px-4 py-2 border-0 rounded bg-primary text-white text-sm cursor-pointer transition-all duration-200 hover:bg-secondary hover:-translate-y-0.5"
       >
-        {#if downloading}
-          ⏳ {downloadProgress}%
-        {:else}
-          ⬇️ Download
-        {/if}
+        ⬇️ Download
       </button>
     {/if}
     <button

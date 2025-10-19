@@ -1,9 +1,16 @@
 <script lang="ts">
   import type { VideoMetadata } from '../../types'
   import VideoItem from './VideoItem.svelte'
+  import { createEventDispatcher } from 'svelte'
 
   export let videos: VideoMetadata[]
   export let onDelete: (videoId: string) => void
+
+  const dispatch = createEventDispatcher()
+
+  function handleToast(event: CustomEvent) {
+    dispatch('toast', event.detail)
+  }
 </script>
 
 <div class="mt-5">
@@ -16,7 +23,7 @@
     <h2 class="text-primary mb-5 text-2xl">My Videos ({videos.length})</h2>
     <div class="flex flex-col gap-3">
       {#each videos as video (video.id)}
-        <VideoItem {video} {onDelete} downloadedFilePath={video.filePath} />
+        <VideoItem {video} {onDelete} downloadedFilePath={video.filePath} on:toast={handleToast} />
       {/each}
     </div>
   {/if}

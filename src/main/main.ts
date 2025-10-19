@@ -1,18 +1,20 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
-import { exec } from 'child_process'
-import { promisify } from 'util'
+import { Innertube } from 'youtubei.js'
 import { databaseService } from './services/database.service.js'
 import { downloadService } from './services/download.service.js'
+import vm from 'vm'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-const execAsync = promisify(exec)
+let youtube: Innertube | null = null
 
 let mainWindow: BrowserWindow | null = null
+
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -33,7 +35,7 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    // mainWindow.webContents.openDevTools()
+    mainWindow.webContents.openDevTools()
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
@@ -43,9 +45,21 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Initialize database
   databaseService.initialize()
+
+  // Initialize Youtube.js client with JavaScript evaluator
+  youtube = await Innertube.create({
+    // Provide VM for URL deciphering
+    po_token: undefined,
+    visitor_data: undefined,
+    generate_session_locally: true,
+    eval_js: (code: string) => {
+      return vm.runInNewContext(code)
+    }
+  })
+  console.log('Youtube.js client initialized with VM evaluator')
 
   createWindow()
 
@@ -69,35 +83,51 @@ app.on('window-all-closed', () => {
 // IPC Handlers
 
 /**
- * Add video by URL - fetch metadata using yt-dlp
+ * Add video by URL - fetch metadata using Youtube.js
  */
 ipcMain.handle('video:add', async (event, url: string) => {
   try {
+    if (!youtube) {
+      throw new Error('Youtube.js client not initialized')
+    }
+
     console.log('Fetching metadata for:', url)
 
-    // Execute yt-dlp to get metadata
-    const { stdout } = await execAsync(
-      `yt-dlp --dump-json --no-warnings "${url}"`
-    )
+    // Extract video ID from URL
+    const videoIdMatch = url.match(/(?:youtu\.be\/|youtube\.com(?:\/embed\/|\/v\/|\/watch\?v=|\/watch\?.+&v=))([^&\n?#]+)/)
+    if (!videoIdMatch) {
+      throw new Error('Invalid YouTube URL')
+    }
+    const videoId = videoIdMatch[1]
 
-    const data = JSON.parse(stdout)
+    // Get video info using Youtube.js
+    const info = await youtube.getInfo(videoId)
+    const basicInfo = info.basic_info
 
     // Check for duplicates
-    const existing = databaseService.getVideoByVideoId(data.id)
+    const existing = databaseService.getVideoByVideoId(videoId)
     if (existing) {
       throw new Error('Video already added')
     }
 
+    // Extract metadata
+    const title = basicInfo.title || 'Untitled'
+    const thumbnailUrl = basicInfo.thumbnail?.[0]?.url || ''
+    const duration = basicInfo.duration || 0
+    const channelName = basicInfo.author || 'Unknown'
+    const description = basicInfo.short_description || ''
+    const uploadDate = basicInfo.start_timestamp?.toISOString().split('T')[0] || ''
+
     // Add to database
     const video = databaseService.addVideo({
-      videoId: data.id,
-      url: url,
-      title: data.title || 'Untitled',
-      thumbnailUrl: data.thumbnail || '',
-      duration: data.duration || 0,
-      channelName: data.uploader || data.channel || 'Unknown',
-      description: data.description,
-      uploadDate: data.upload_date
+      videoId,
+      url,
+      title,
+      thumbnailUrl,
+      duration,
+      channelName,
+      description,
+      uploadDate
     })
 
     console.log('Video added:', video.title)
@@ -138,13 +168,78 @@ ipcMain.handle('video:getAll', async () => {
       thumbnail: v.thumbnailUrl,
       duration: v.duration,
       channel: v.channelName,
-      filePath: v.filePath || undefined
+      filePath: v.filePath || undefined,
+      downloadStatus: v.downloadStatus,
+      downloadProgress: v.downloadProgress,
+      fileSize: v.fileSize || undefined
     }))
 
     return { success: true, videos }
   } catch (error) {
     console.error('Error getting videos:', error)
     return { success: false, error: 'Failed to get videos' }
+  }
+})
+
+/**
+ * Search videos in local database
+ */
+ipcMain.handle('video:search', async (event, query: string) => {
+  try {
+    console.log('Local search request received:', query)
+    const dbVideos = databaseService.searchVideos(query)
+    console.log('Local search results:', dbVideos.length, 'videos found')
+
+    // Convert to frontend format
+    const videos = dbVideos.map(v => ({
+      id: v.videoId,
+      url: v.url,
+      title: v.title,
+      thumbnail: v.thumbnailUrl,
+      duration: v.duration,
+      channel: v.channelName,
+      filePath: v.filePath || undefined,
+      downloadStatus: v.downloadStatus,
+      downloadProgress: v.downloadProgress,
+      fileSize: v.fileSize || undefined
+    }))
+
+    return { success: true, videos }
+  } catch (error) {
+    console.error('Error searching videos:', error)
+    return { success: false, error: 'Failed to search videos' }
+  }
+})
+
+/**
+ * Search videos on YouTube
+ */
+ipcMain.handle('video:searchYouTube', async (event, query: string) => {
+  try {
+    if (!youtube) {
+      throw new Error('Youtube.js client not initialized')
+    }
+
+    console.log('YouTube search request:', query)
+
+    const searchResults = await youtube.search(query, { type: 'video' })
+    const videos = searchResults.videos?.slice(0, 10).map((video: any) => ({
+      id: video.id,
+      url: `https://www.youtube.com/watch?v=${video.id}`,
+      title: video.title?.text || 'Untitled',
+      thumbnail: video.thumbnails?.[0]?.url || video.best_thumbnail?.url || '',
+      duration: video.duration?.seconds || 0,
+      channel: video.author?.name || 'Unknown',
+      viewCount: video.view_count?.text || '',
+      publishedDate: video.published?.text || ''
+    })) || []
+
+    console.log('YouTube search results:', videos.length, 'videos found')
+
+    return { success: true, videos }
+  } catch (error) {
+    console.error('Error searching YouTube:', error)
+    return { success: false, error: 'Failed to search YouTube' }
   }
 })
 
@@ -158,7 +253,13 @@ ipcMain.handle('video:delete', async (event, videoId: string) => {
       throw new Error('Video not found')
     }
 
-    databaseService.deleteVideo(video.id)
+    // Delete downloaded file if exists
+    if (video.filePath && fs.existsSync(video.filePath)) {
+      fs.unlinkSync(video.filePath)
+      console.log('Deleted file:', video.filePath)
+    }
+
+    databaseService.deleteVideoByVideoId(videoId)
     console.log('Video deleted:', videoId)
     return { success: true }
   } catch (error) {
@@ -168,18 +269,14 @@ ipcMain.handle('video:delete', async (event, videoId: string) => {
 })
 
 /**
- * Check if yt-dlp is installed
+ * Check system status (Youtube.js is bundled, no external dependencies needed)
  */
 ipcMain.handle('system:checkYtDlp', async () => {
-  try {
-    await execAsync('yt-dlp --version')
-    return { success: true, installed: true }
-  } catch (error) {
-    return {
-      success: false,
-      installed: false,
-      error: 'yt-dlp not found. Please install: brew install yt-dlp'
-    }
+  // Youtube.js is bundled with the app, no external dependencies required
+  return {
+    success: true,
+    installed: true,
+    message: 'Using Youtube.js (no external dependencies required)'
   }
 })
 
@@ -230,3 +327,4 @@ ipcMain.handle('system:getDownloadsPath', async () => {
     return { success: false, error: 'Failed to get downloads path' }
   }
 })
+

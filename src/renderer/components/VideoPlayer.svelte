@@ -10,7 +10,14 @@
   let videoElement: HTMLVideoElement
   let player: Plyr | null = null
 
+  // Watch for videoPath changes and reload video
+  $: if (videoElement && videoPath) {
+    console.log('▶️ VideoPlayer: Loading stream URL:', videoPath)
+    videoElement.load()
+  }
+
   onMount(() => {
+    console.log('VideoPlayer mounted with path:', videoPath)
     if (videoElement) {
       player = new Plyr(videoElement, {
         controls: [
@@ -59,11 +66,30 @@
     <div class="relative pt-[56.25%] bg-black">
       <video
         bind:this={videoElement}
+        src={videoPath}
         controls
         playsinline
+        autoplay
         class="absolute top-0 left-0 w-full h-full"
+        on:error={(e) => {
+          console.error('▶️ Video error:', e)
+          const target = e.currentTarget
+          if (target && target.error) {
+            console.error('▶️ Video error details:', {
+              code: target.error.code,
+              message: target.error.message,
+              MEDIA_ERR_ABORTED: target.error.MEDIA_ERR_ABORTED,
+              MEDIA_ERR_NETWORK: target.error.MEDIA_ERR_NETWORK,
+              MEDIA_ERR_DECODE: target.error.MEDIA_ERR_DECODE,
+              MEDIA_ERR_SRC_NOT_SUPPORTED: target.error.MEDIA_ERR_SRC_NOT_SUPPORTED
+            })
+          }
+        }}
+        on:loadstart={() => console.log('▶️ Video loading started')}
+        on:canplay={() => console.log('▶️ Video can play')}
+        on:loadedmetadata={() => console.log('▶️ Video metadata loaded')}
+        on:loadeddata={() => console.log('▶️ Video data loaded')}
       >
-        <source src={videoPath} type="video/mp4" />
         Your browser does not support the video tag.
       </video>
     </div>

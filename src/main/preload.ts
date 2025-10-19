@@ -4,13 +4,15 @@ const { contextBridge, ipcRenderer } = require('electron')
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld('api', {
   video: {
-    add: (url) => ipcRenderer.invoke('video:add', url),
+    add: (url: string) => ipcRenderer.invoke('video:add', url),
     getAll: () => ipcRenderer.invoke('video:getAll'),
-    delete: (videoId) => ipcRenderer.invoke('video:delete', videoId),
-    download: (videoId, url) => ipcRenderer.invoke('video:download', videoId, url),
-    cancelDownload: (videoId) => ipcRenderer.invoke('video:cancelDownload', videoId),
-    onDownloadProgress: (callback) => {
-      ipcRenderer.on('download:progress', (event, data) => callback(data))
+    search: (query: string) => ipcRenderer.invoke('video:search', query),
+    searchYouTube: (query: string) => ipcRenderer.invoke('video:searchYouTube', query),
+    delete: (videoId: string) => ipcRenderer.invoke('video:delete', videoId),
+    download: (videoId: string, url: string) => ipcRenderer.invoke('video:download', videoId, url),
+    cancelDownload: (videoId: string) => ipcRenderer.invoke('video:cancelDownload', videoId),
+    onDownloadProgress: (callback: (data: { videoId: string; progress: number }) => void) => {
+      ipcRenderer.on('download:progress', (_event: any, data: { videoId: string; progress: number }) => callback(data))
     }
   },
   system: {

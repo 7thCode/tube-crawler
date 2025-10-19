@@ -40,4 +40,4 @@ thumbnails/
 .env
 .env.local
 
-release
+release/
