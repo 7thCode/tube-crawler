@@ -65,8 +65,14 @@
       return
     }
 
-    // Convert file path to file:// URL
-    videoFilePath = `file://${filePath}`
+    // Extract filename from full path and use custom tube:// protocol
+    // Example: /path/to/downloads/S6AA5JArNcE.mp4 -> tube://S6AA5JArNcE.mp4
+    const filename = filePath.split('/').pop() || filePath.split('\\').pop()
+    videoFilePath = `tube://${filename}`
+
+    console.log('🎬 Playing video:', filePath)
+    console.log('🎬 Using custom protocol:', videoFilePath)
+
     showPlayer = true
   }
 

@@ -36,6 +36,20 @@
   onMount(async () => {
     // Load existing videos
     await loadVideos()
+
+    // Listen for download completion events
+    window.api.video.onDownloadComplete(async (data) => {
+      console.log('✅ Download completed:', data.videoId)
+      // Reload videos to update UI
+      await loadVideos()
+      showToast(`Download completed!`, 'success')
+    })
+
+    // Listen for download error events
+    window.api.video.onDownloadError((data) => {
+      console.error('❌ Download failed:', data.videoId, data.error)
+      showToast(`Download failed: ${data.error}`, 'error')
+    })
   })
 
   async function loadVideos() {

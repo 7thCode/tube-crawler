@@ -1,15 +1,13 @@
-import { Innertube } from 'youtubei.js'
 import { app } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { Readable } from 'stream'
 import { databaseService } from './database.service.js'
-import vm from 'vm'
+import { youtubeService } from './youtube.service.js'
 
 class DownloadService {
   private downloadsPath: string
   private activeDownloads: Map<string, AbortController> = new Map()
-  private youtube: Innertube | null = null
 
   constructor() {
     // Use app's downloads directory
@@ -25,32 +23,11 @@ class DownloadService {
   }
 
   /**
-   * Initialize Youtube.js client
-   */
-  async initialize() {
-    if (!this.youtube) {
-      this.youtube = await Innertube.create({
-        // Provide VM for URL deciphering
-        po_token: undefined,
-        visitor_data: undefined,
-        generate_session_locally: true,
-        eval_js: (code: string) => {
-          return vm.runInNewContext(code)
-        }
-      })
-      console.log('Youtube.js client initialized with VM evaluator')
-    }
-  }
-
-  /**
    * Download video using Youtube.js
    */
   async downloadVideo(videoId: string, url: string, onProgress?: (progress: number) => void) {
-    // Ensure Youtube.js is initialized
-    await this.initialize()
-    if (!this.youtube) {
-      throw new Error('Youtube.js client not initialized')
-    }
+    // Get Youtube.js client from singleton service
+    const youtube = await youtubeService.getClient()
 
     // Check if already downloading
     if (this.activeDownloads.has(videoId)) {
@@ -68,7 +45,7 @@ class DownloadService {
       console.log('Fetching video info:', videoId)
 
       // Get video info
-      const info = await this.youtube.getInfo(videoId)
+      const info = await youtube.getInfo(videoId)
 
       // Choose best format (video+audio)
       const format = info.chooseFormat({

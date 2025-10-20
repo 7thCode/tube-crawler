@@ -13,6 +13,12 @@ contextBridge.exposeInMainWorld('api', {
     cancelDownload: (videoId: string) => ipcRenderer.invoke('video:cancelDownload', videoId),
     onDownloadProgress: (callback: (data: { videoId: string; progress: number }) => void) => {
       ipcRenderer.on('download:progress', (_event: any, data: { videoId: string; progress: number }) => callback(data))
+    },
+    onDownloadComplete: (callback: (data: { videoId: string; filePath: string }) => void) => {
+      ipcRenderer.on('download:complete', (_event: any, data: { videoId: string; filePath: string }) => callback(data))
+    },
+    onDownloadError: (callback: (data: { videoId: string; error: string }) => void) => {
+      ipcRenderer.on('download:error', (_event: any, data: { videoId: string; error: string }) => callback(data))
     }
   },
   system: {

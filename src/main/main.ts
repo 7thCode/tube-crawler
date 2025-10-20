@@ -1,19 +1,41 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, ipcMain, protocol } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { dirname } from 'path'
-import { Innertube } from 'youtubei.js'
 import { databaseService } from './services/database.service.js'
 import { downloadService } from './services/download.service.js'
-import vm from 'vm'
+import { youtubeService } from './services/youtube.service.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
-let youtube: Innertube | null = null
-
 let mainWindow: BrowserWindow | null = null
+
+/**
+ * Register custom protocol for serving local video files
+ * This allows secure access to videos without disabling webSecurity
+ */
+function registerVideoProtocol() {
+  protocol.registerFileProtocol('tube', (request, callback) => {
+    // Extract file path from tube://video/{videoId}.mp4
+    const url = request.url.substr(7) // Remove 'tube://'
+    const videoPath = path.join(downloadService.getDownloadsPath(), url)
+
+    console.log('📺 Custom protocol request:', request.url)
+    console.log('📺 Serving file:', videoPath)
+
+    // Verify file exists and is within downloads directory
+    if (fs.existsSync(videoPath) && videoPath.startsWith(downloadService.getDownloadsPath())) {
+      callback({ path: videoPath })
+    } else {
+      console.error('📺 File not found or unauthorized:', videoPath)
+      callback({ error: -6 }) // FILE_NOT_FOUND
+    }
+  })
+
+  console.log('📺 Custom protocol "tube://" registered')
+}
 
 
 function createWindow() {
@@ -24,7 +46,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false // Required for local file access (TODO: use custom protocol in production)
+      webSecurity: true // Using custom protocol for secure local file access
     },
     backgroundColor: '#1a1a1a',
     title: 'Tube Crawler'
@@ -35,7 +57,7 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
-    mainWindow.webContents.openDevTools()
+    // mainWindow.webContents.openDevTools() // Disabled - press Cmd+Option+I to open manually
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
@@ -46,20 +68,14 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Register custom protocol for video files
+  registerVideoProtocol()
+
   // Initialize database
   databaseService.initialize()
 
-  // Initialize Youtube.js client with JavaScript evaluator
-  youtube = await Innertube.create({
-    // Provide VM for URL deciphering
-    po_token: undefined,
-    visitor_data: undefined,
-    generate_session_locally: true,
-    eval_js: (code: string) => {
-      return vm.runInNewContext(code)
-    }
-  })
-  console.log('Youtube.js client initialized with VM evaluator')
+  // Initialize Youtube.js client (singleton)
+  await youtubeService.initialize()
 
   createWindow()
 
@@ -87,9 +103,8 @@ app.on('window-all-closed', () => {
  */
 ipcMain.handle('video:add', async (event, url: string) => {
   try {
-    if (!youtube) {
-      throw new Error('Youtube.js client not initialized')
-    }
+    // Get Youtube.js client from singleton service
+    const youtube = await youtubeService.getClient()
 
     console.log('Fetching metadata for:', url)
 
@@ -216,9 +231,8 @@ ipcMain.handle('video:search', async (event, query: string) => {
  */
 ipcMain.handle('video:searchYouTube', async (event, query: string) => {
   try {
-    if (!youtube) {
-      throw new Error('Youtube.js client not initialized')
-    }
+    // Get Youtube.js client from singleton service
+    const youtube = await youtubeService.getClient()
 
     console.log('YouTube search request:', query)
 
@@ -293,9 +307,17 @@ ipcMain.handle('video:download', async (event, videoId: string, url: string) => 
     })
 
     console.log('Download completed:', videoId, result.filePath)
+
+    // Send completion event to trigger UI update
+    event.sender.send('download:complete', { videoId, filePath: result.filePath })
+
     return { success: true, ...result }
   } catch (error) {
     console.error('Error downloading video:', error)
+
+    // Send error event
+    event.sender.send('download:error', { videoId, error: error instanceof Error ? error.message : 'Failed to download video' })
+
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to download video'

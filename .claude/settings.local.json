@@ -1,18 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(sqlite3 ~/Library/Application Support/tube-crawler/database/videos.db \"SELECT video_id, title, channel_name FROM videos\")",
-      "mcp__serena__replace_regex",
-      "Read(//Users/oda/Desktop/**)",
-      "Read(//Users/oda/**)",
-      "mcp__context7__resolve-library-id",
-      "mcp__context7__get-library-docs",
-      "Bash(npm run electron:dev)",
-      "Bash(sqlite3 ~/Library/Application Support/tube-crawler/database/videos.db \"SELECT video_id, title, download_status, file_path FROM videos LIMIT 5\")",
-      "Bash(sqlite3 ~/Library/Application Support/tube-crawler/database/videos.db \"SELECT video_id, title, download_status FROM videos\")",
-      "Bash(tee /tmp/electron-output.log)",
-      "Read(//private/tmp/**)",
-      "Bash(sqlite3 ~/Library/Application Support/tube-crawler/database/videos.db \"SELECT video_id, title, download_status, download_progress, file_path FROM videos\")"
+      "Bash(cat node_modules/youtubei.js/package.json)",
+      "WebFetch(domain:ytjs.dev)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
