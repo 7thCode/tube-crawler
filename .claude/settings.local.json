@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cat node_modules/youtubei.js/package.json)",
       "WebFetch(domain:ytjs.dev)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(npm run build:dmg:*)"
     ],
     "deny": [],
     "ask": []
