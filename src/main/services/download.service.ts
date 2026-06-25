@@ -10,9 +10,8 @@ class DownloadService {
   private activeDownloads: Map<string, AbortController> = new Map()
 
   constructor() {
-    // Use app's downloads directory
-    const userDataPath = app.getPath('userData')
-    this.downloadsPath = path.join(userDataPath, 'downloads')
+    // Use ~/Movies/YouTube as the downloads directory
+    this.downloadsPath = path.join(app.getPath('home'), 'Movies', 'YouTube')
 
     // Ensure directory exists
     if (!fs.existsSync(this.downloadsPath)) {
