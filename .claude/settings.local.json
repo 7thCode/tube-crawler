@@ -4,7 +4,13 @@
       "Bash(cat node_modules/youtubei.js/package.json)",
       "WebFetch(domain:ytjs.dev)",
       "WebSearch",
-      "Bash(npm run build:dmg:*)"
+      "Bash(npm run build:dmg:*)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(npm show *)",
+      "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\)\\); const vs=Object.entries\\(d\\).filter\\(\\([k]\\)=>k!='created'&&k!='modified'\\).sort\\(\\(a,b\\)=>new Date\\(b[1]\\)-new Date\\(a[1]\\)\\).slice\\(0,5\\); vs.forEach\\(\\([k,v]\\)=>console.log\\(k,v\\)\\)\")",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
     ],
     "deny": [],
     "ask": []
