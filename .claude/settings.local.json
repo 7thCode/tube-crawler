@@ -10,7 +10,12 @@
       "Bash(npm show *)",
       "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\)\\); const vs=Object.entries\\(d\\).filter\\(\\([k]\\)=>k!='created'&&k!='modified'\\).sort\\(\\(a,b\\)=>new Date\\(b[1]\\)-new Date\\(a[1]\\)\\).slice\\(0,5\\); vs.forEach\\(\\([k,v]\\)=>console.log\\(k,v\\)\\)\")",
       "Bash(npm install *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'feat\\(download\\): change video save path to ~/Movies/YouTube' --body ' *)",
+      "Skill(run)",
+      "Skill(run:*)"
     ],
     "deny": [],
     "ask": []
